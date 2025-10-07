@@ -73,6 +73,7 @@ func (c *Client) sendHeartbeat() {
 		c.logger.Println("err: failed to create request", err)
 	}
 
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("ApiKey %s", c.cfg.ApiKey))
 	req.Header.Set("x-request-timestamp", isoTsString)
 	req.Header.Set("signature", fmt.Sprintf("sha256=%s", signedCanonical))
