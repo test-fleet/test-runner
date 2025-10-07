@@ -44,7 +44,7 @@ func (c *Client) Run(ctx context.Context) {
 
 func (c *Client) sendHeartbeat() {
 	httpMethod := http.MethodPost
-	httpPath := fmt.Sprintf("%s/api/v1/runners/heartbeat", c.cfg.ControlServerUrl)
+	httpPath := "/api/v1/runners/heartbeat"
 	body := map[string]string{"name": c.cfg.RunnerName}
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
@@ -64,7 +64,8 @@ func (c *Client) sendHeartbeat() {
 	}
 	signedCanonical := utils.SignCanonical(canonicalString, c.cfg.ApiSecret)
 
-	req, err := http.NewRequest(httpMethod, httpPath, bytes.NewBuffer(jsonBody))
+	httpUrl := fmt.Sprintf("%s%s", c.cfg.ControlServerUrl, httpPath)
+	req, err := http.NewRequest(httpMethod, httpUrl, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		c.logger.Println("err: failed to create request", err)
 	}
