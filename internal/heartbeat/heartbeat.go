@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"time"
@@ -84,6 +85,13 @@ func (c *Client) sendHeartbeat() {
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		c.logger.Printf("err: heartbeat failed with status %d", res.StatusCode)
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			c.logger.Printf("err: failed to read res body %d", err)
+		} else {
+			bodyString := string(bodyBytes)
+			c.logger.Println("res body:", bodyString)
+		}
 		return
 	}
 }
