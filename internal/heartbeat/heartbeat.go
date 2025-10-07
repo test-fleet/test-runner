@@ -46,7 +46,7 @@ func (c *Client) Run(ctx context.Context) {
 func (c *Client) sendHeartbeat() {
 	httpMethod := http.MethodPost
 	httpPath := "/api/v1/runners/heartbeat"
-	body := map[string]string{"name": c.cfg.RunnerName}
+	body := map[string]bool{"heartbeat": true}
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
 		c.logger.Println("err: failed to marshall json body", err)
