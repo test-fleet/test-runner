@@ -60,6 +60,8 @@ func (c *Client) sendHeartbeat() {
 		body,
 		isoTsString,
 	)
+
+	c.logger.Println(canonicalString)
 	if err != nil {
 		c.logger.Println("err: failed to create canonical string", err)
 	}
