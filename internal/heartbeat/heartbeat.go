@@ -73,7 +73,7 @@ func (c *Client) sendHeartbeat() {
 
 	req.Header.Set("Authorization", fmt.Sprintf("ApiKey %s", c.cfg.ApiKey))
 	req.Header.Set("x-request-timestamp", isoTsString)
-	req.Header.Set("signature", signedCanonical)
+	req.Header.Set("signature", fmt.Sprintf("sha256=%s", signedCanonical))
 
 	res, err := c.http.Do(req)
 	if err != nil {
