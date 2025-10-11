@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      
+  simulator:
+    image: ghcr.io/test-fleet/pubsub-simulator:latest
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - CHANNEL_NAME=testfleet:jobs
+      - INTERVAL_SECONDS=10
+    depends_on:
+      redis:
+        condition: service_healthy
+        
+  test-subscriber:
+    image: redis:7-alpine
+    command: redis-cli -h redis SUBSCRIBE testfleet:jobs
+    depends_on:
+      - redis
+
+  runner:
+    build:
+      context: .
+      dockerfile: ./dockerfile
+    container_name: testfleet-runner
+    restart: unless-stopped
+    environment:
+      CONTROL_SERVER_URL: ${CONTROL_SERVER_URL}
+      API_KEY: ${API_KEY}
+      API_SECRET: ${API_SECRET}
+      HEARTBEAT_INTERVAL: ${HEARTBEAT_INTERVAL}
+      REDIS_URL: ${REDIS_URL}
+      REDIS_CHANNEL: ${REDIS_CHANNEL}
+      MAX_WORKERS: ${MAX_WORKERS}
