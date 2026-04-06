@@ -80,10 +80,6 @@ func (c *Client) sendHeartbeat() {
 	req.Header.Set("x-request-timestamp", isoTsString)
 	req.Header.Set("signature", fmt.Sprintf("sha256=%s", signedCanonical))
 
-	c.logger.Printf("Request URL: %s", httpUrl)
-	c.logger.Printf("Request Headers: %v", req.Header)
-	c.logger.Printf("Request Body: %s", string(jsonBody))
-
 	res, err := c.http.Do(req)
 	if err != nil {
 		c.logger.Println("err: request failed", err)
