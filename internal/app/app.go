@@ -15,6 +15,7 @@ import (
 	"github.com/test-fleet/test-runner/internal/runner"
 	"github.com/test-fleet/test-runner/internal/subscriber"
 	"github.com/test-fleet/test-runner/internal/worker"
+	"github.com/test-fleet/test-runner/pkg/models"
 )
 
 func Run() {
@@ -42,7 +43,7 @@ func Run() {
 		log.Fatalf("err: failed to ping redis server %v", err)
 	}
 
-	jobChan := make(chan string)
+	jobChan := make(chan *models.Job)
 	resChan := make(chan bool)
 
 	subLogger := log.New(os.Stderr, "Redis client: ", log.LstdFlags)

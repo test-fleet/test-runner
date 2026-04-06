@@ -6,11 +6,12 @@ import (
 	"sync"
 
 	"github.com/test-fleet/test-runner/internal/runner"
+	"github.com/test-fleet/test-runner/pkg/models"
 )
 
 type WorkerPool struct {
 	logger      *log.Logger
-	jobChan     <-chan string
+	jobChan     <-chan *models.Job
 	resultsChan chan<- bool
 	maxWorkers  int
 	runner      runner.TestRunner
@@ -19,7 +20,7 @@ type WorkerPool struct {
 
 func NewWorkerPool(
 	logger *log.Logger,
-	jobChan <-chan string,
+	jobChan <-chan *models.Job,
 	resultsChan chan<- bool,
 	maxWorkers int,
 	runner runner.TestRunner,
@@ -63,16 +64,16 @@ func (w *WorkerPool) run(ctx context.Context, workerId int) {
 	}
 }
 
-func (w *WorkerPool) processJob(ctx context.Context, workerId int, job string) {
+func (w *WorkerPool) processJob(ctx context.Context, workerId int, job *models.Job) {
 	w.logger.Printf("Worker %d processing job", workerId)
 
 	res := w.runner.Run(ctx, job)
 
 	select {
 	case w.resultsChan <- res:
-		w.logger.Printf("worker %d completed job", workerId)
+		w.logger.Printf("worker %d completed job %s", workerId, job.JobID)
 	case <-ctx.Done():
-		w.logger.Printf("worker %d interrupted while sending results", workerId)
+		w.logger.Printf("worker %d interrupted while sending results for job %s", workerId, job.JobID)
 	}
 }
 

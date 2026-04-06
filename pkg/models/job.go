@@ -1,9 +1,10 @@
 package models
 
 type Job struct {
-	JobID   string  `json:"jobId"`
-	SceneID string  `json:"sceneId"`
-	RunID   string  `json:"runId"`
-	Scene   Scene   `json:"scene"`
-	Frames  []Frame `json:"frames"`
+	JobID     string  `json:"jobId"`
+	Type      string  `json:"type"`
+	RunID     string  `json:"runId"`
+	Scene     Scene   `json:"scene"`
+	Frames    []Frame `json:"frames"`
+	CreatedAt string  `json:"createdAt"`
 }

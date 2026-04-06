@@ -50,6 +50,7 @@ func (c *Client) sendHeartbeat() {
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
 		c.logger.Println("err: failed to marshall json body", err)
+		return
 	}
 	now := time.Now().UTC()
 
@@ -63,6 +64,7 @@ func (c *Client) sendHeartbeat() {
 
 	if err != nil {
 		c.logger.Println("err: failed to create canonical string", err)
+		return
 	}
 	signedCanonical := utils.SignCanonical(canonicalString, c.cfg.ApiSecret)
 
@@ -70,12 +72,17 @@ func (c *Client) sendHeartbeat() {
 	req, err := http.NewRequest(httpMethod, httpUrl, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		c.logger.Println("err: failed to create request", err)
+		return
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("ApiKey %s", c.cfg.ApiKey))
 	req.Header.Set("x-request-timestamp", isoTsString)
 	req.Header.Set("signature", fmt.Sprintf("sha256=%s", signedCanonical))
+
+	c.logger.Printf("Request URL: %s", httpUrl)
+	c.logger.Printf("Request Headers: %v", req.Header)
+	c.logger.Printf("Request Body: %s", string(jsonBody))
 
 	res, err := c.http.Do(req)
 	if err != nil {
