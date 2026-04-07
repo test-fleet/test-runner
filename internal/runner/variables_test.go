@@ -464,6 +464,165 @@ func TestReplaceJsonVarsEdgeCases(t *testing.T) {
 	}
 }
 
+// TestReplaceJsonVars_MainPathBranches tests branches in replaceJsonVars that are only
+// reached when the JSON template is already valid (placeholders appear inside quoted strings).
+// In this context, replacements produce JSON with values as strings (e.g. "30" not 30).
+func TestReplaceJsonVars_MainPathBranches(t *testing.T) {
+	e := &TestRunner{
+		logger: log.New(io.Discard, "", 0),
+	}
+
+	tests := []struct {
+		name     string
+		jsonText string
+		varMap   map[string]models.Variable
+		expected string
+	}{
+		{
+			// float64 in "number" type: replacement = "30", result keeps it as JSON string "30"
+			name:     "number float64 value in valid JSON template",
+			jsonText: `{"age": "${age}"}`,
+			varMap: map[string]models.Variable{
+				"age": {Value: float64(30), Type: "number"},
+			},
+			expected: `{"age": "30"}`,
+		},
+		{
+			// int in "number" type
+			name:     "number int value in valid JSON template",
+			jsonText: `{"count": "${count}"}`,
+			varMap: map[string]models.Variable{
+				"count": {Value: int(10), Type: "number"},
+			},
+			expected: `{"count": "10"}`,
+		},
+		{
+			// valid numeric string in "number" type
+			name:     "number valid string value in valid JSON template",
+			jsonText: `{"pi": "${pi}"}`,
+			varMap: map[string]models.Variable{
+				"pi": {Value: "3.14", Type: "number"},
+			},
+			expected: `{"pi": "3.14"}`,
+		},
+		{
+			// invalid string in "number" type falls back to "0"
+			name:     "number invalid string value defaults to zero",
+			jsonText: `{"count": "${count}"}`,
+			varMap: map[string]models.Variable{
+				"count": {Value: "not-a-number", Type: "number"},
+			},
+			expected: `{"count": "0"}`,
+		},
+		{
+			// unknown Go type in "number" type defaults to "0"
+			name:     "number unknown Go type defaults to zero",
+			jsonText: `{"count": "${count}"}`,
+			varMap: map[string]models.Variable{
+				"count": {Value: []int{1, 2}, Type: "number"},
+			},
+			expected: `{"count": "0"}`,
+		},
+		{
+			// bool value in "boolean" type
+			name:     "boolean bool value in valid JSON template",
+			jsonText: `{"active": "${active}"}`,
+			varMap: map[string]models.Variable{
+				"active": {Value: true, Type: "boolean"},
+			},
+			expected: `{"active": "true"}`,
+		},
+		{
+			// string "true" in "boolean" type
+			name:     "boolean string true in valid JSON template",
+			jsonText: `{"active": "${active}"}`,
+			varMap: map[string]models.Variable{
+				"active": {Value: "true", Type: "boolean"},
+			},
+			expected: `{"active": "true"}`,
+		},
+		{
+			// string "false" in "boolean" type
+			name:     "boolean string false in valid JSON template",
+			jsonText: `{"active": "${active}"}`,
+			varMap: map[string]models.Variable{
+				"active": {Value: "false", Type: "boolean"},
+			},
+			expected: `{"active": "false"}`,
+		},
+		{
+			// unknown Go type in "boolean" type defaults to "false"
+			name:     "boolean unknown Go type defaults to false",
+			jsonText: `{"active": "${active}"}`,
+			varMap: map[string]models.Variable{
+				"active": {Value: int(1), Type: "boolean"},
+			},
+			expected: `{"active": "false"}`,
+		},
+		{
+			// non-nil value with type "null" → replacement is "null" (string in JSON)
+			name:     "null type with non-nil value in valid JSON template",
+			jsonText: `{"data": "${data}"}`,
+			varMap: map[string]models.Variable{
+				"data": {Value: "something", Type: "null"},
+			},
+			expected: `{"data": "null"}`,
+		},
+		{
+			// string type with non-string value → uses fmt.Sprintf, then falls back (JSON becomes invalid)
+			name:     "string type with float64 value falls back correctly",
+			jsonText: `{"val": "${val}"}`,
+			varMap: map[string]models.Variable{
+				"val": {Value: float64(42), Type: "string"},
+			},
+			expected: `{"val": "42"}`,
+		},
+		{
+			// unknown type → default case, falls back
+			name:     "unknown variable type uses default case",
+			jsonText: `{"val": "${val}"}`,
+			varMap: map[string]models.Variable{
+				"val": {Value: int(99), Type: "custom"},
+			},
+			expected: `{"val": "99"}`,
+		},
+		{
+			// nil value with type "null" in main path
+			name:     "nil value with null type in valid JSON template",
+			jsonText: `{"data": "${data}"}`,
+			varMap: map[string]models.Variable{
+				"data": {Value: nil, Type: "null"},
+			},
+			expected: `{"data": "null"}`,
+		},
+		{
+			// nil value with type "number" in main path
+			name:     "nil value with number type in valid JSON template",
+			jsonText: `{"count": "${count}"}`,
+			varMap: map[string]models.Variable{
+				"count": {Value: nil, Type: "number"},
+			},
+			expected: `{"count": "0"}`,
+		},
+		{
+			// nil value with type "boolean" in main path
+			name:     "nil value with boolean type in valid JSON template",
+			jsonText: `{"active": "${active}"}`,
+			varMap: map[string]models.Variable{
+				"active": {Value: nil, Type: "boolean"},
+			},
+			expected: `{"active": "false"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := e.replaceJsonVars(tt.jsonText, tt.varMap)
+			assert.JSONEq(t, tt.expected, result)
+		})
+	}
+}
+
 func TestReplaceVarsInJsonString(t *testing.T) {
 	e := &TestRunner{}
 

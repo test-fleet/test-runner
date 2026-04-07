@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"sync"
+	"sync/atomic"
 
 	"github.com/test-fleet/test-runner/internal/runner"
 	"github.com/test-fleet/test-runner/pkg/models"
@@ -16,6 +17,7 @@ type WorkerPool struct {
 	maxWorkers  int
 	runner      runner.TestRunner
 	wg          sync.WaitGroup
+	activeJobs  atomic.Int32
 }
 
 func NewWorkerPool(
@@ -64,8 +66,14 @@ func (w *WorkerPool) run(ctx context.Context, workerId int) {
 	}
 }
 
+func (w *WorkerPool) ActiveJobs() int {
+	return int(w.activeJobs.Load())
+}
+
 func (w *WorkerPool) processJob(ctx context.Context, workerId int, job *models.Job) {
 	w.logger.Printf("Worker %d processing job", workerId)
+	w.activeJobs.Add(1)
+	defer w.activeJobs.Add(-1)
 
 	res := w.runner.Run(ctx, job)
 

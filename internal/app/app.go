@@ -26,13 +26,6 @@ func Run() {
 
 	ctx, _ := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
-	hbLogger := log.New(os.Stderr, "Heartbeat Client: ", log.LstdFlags)
-	httpClient := &http.Client{
-		Timeout: 15 * time.Second,
-	}
-	heartbeatClient := heartbeat.NewClient(cfg, hbLogger, httpClient)
-	go heartbeatClient.Run(ctx)
-
 	opts, err := redis.ParseURL(cfg.RedisUrl)
 	if err != nil {
 		log.Fatalf("err: failed to parse redis url %v", err)
@@ -61,6 +54,13 @@ func Run() {
 		*runner,
 	)
 	workers.Start(ctx)
+
+	hbLogger := log.New(os.Stderr, "Heartbeat Client: ", log.LstdFlags)
+	httpClient := &http.Client{
+		Timeout: 15 * time.Second,
+	}
+	heartbeatClient := heartbeat.NewClient(cfg, hbLogger, httpClient, workers.ActiveJobs)
+	go heartbeatClient.Run(ctx)
 
 	go func() {
 		if err := sub.Subscribe(ctx); err != nil && err != context.Canceled {

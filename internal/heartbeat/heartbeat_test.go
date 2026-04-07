@@ -23,7 +23,7 @@ func TestNewClient(t *testing.T) {
 	logger := log.New(io.Discard, "", 0)
 	httpClient := &http.Client{}
 
-	client := NewClient(cfg, logger, httpClient)
+	client := NewClient(cfg, logger, httpClient, func() int { return 0 })
 
 	if client == nil {
 		t.Fatal("NewClient() returned nil")
@@ -84,7 +84,7 @@ func TestSendHeartbeat_Success(t *testing.T) {
 	logger := log.New(io.Discard, "", 0)
 	httpClient := server.Client()
 
-	client := NewClient(cfg, logger, httpClient)
+	client := NewClient(cfg, logger, httpClient, func() int { return 0 })
 	client.sendHeartbeat()
 	// If we get here without panic, test passes
 }
@@ -106,7 +106,7 @@ func TestSendHeartbeat_ServerError(t *testing.T) {
 	logger := log.New(io.Discard, "", 0)
 	httpClient := server.Client()
 
-	client := NewClient(cfg, logger, httpClient)
+	client := NewClient(cfg, logger, httpClient, func() int { return 0 })
 	// Should not panic, just log the error
 	client.sendHeartbeat()
 }
@@ -129,7 +129,7 @@ func TestRun_ContextCancellation(t *testing.T) {
 	logger := log.New(io.Discard, "", 0)
 	httpClient := server.Client()
 
-	client := NewClient(cfg, logger, httpClient)
+	client := NewClient(cfg, logger, httpClient, func() int { return 0 })
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -176,7 +176,7 @@ func TestRun_SendsPeriodicHeartbeats(t *testing.T) {
 	logger := log.New(io.Discard, "", 0)
 	httpClient := server.Client()
 
-	client := NewClient(cfg, logger, httpClient)
+	client := NewClient(cfg, logger, httpClient, func() int { return 0 })
 
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()

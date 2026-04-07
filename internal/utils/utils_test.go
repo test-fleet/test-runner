@@ -9,7 +9,7 @@ func TestBuildCanonicalString(t *testing.T) {
 		name       string
 		httpMethod string
 		httpPath   string
-		body       map[string]bool
+		body       map[string]interface{}
 		timestamp  string
 		want       string
 		wantErr    bool
@@ -18,7 +18,7 @@ func TestBuildCanonicalString(t *testing.T) {
 			name:       "basic request with empty body",
 			httpMethod: "GET",
 			httpPath:   "/api/users",
-			body:       map[string]bool{},
+			body:       map[string]interface{}{},
 			timestamp:  "1234567890",
 			want:       "1234567890.GET./api/users.{}",
 			wantErr:    false,
@@ -27,7 +27,7 @@ func TestBuildCanonicalString(t *testing.T) {
 			name:       "POST request with body",
 			httpMethod: "POST",
 			httpPath:   "/api/jobs",
-			body:       map[string]bool{"active": true},
+			body:       map[string]interface{}{"active": true},
 			timestamp:  "1234567890",
 			want:       "1234567890.POST./api/jobs.{\"active\":true}",
 			wantErr:    false,
@@ -36,7 +36,7 @@ func TestBuildCanonicalString(t *testing.T) {
 			name:       "request with multiple body fields",
 			httpMethod: "PUT",
 			httpPath:   "/api/settings",
-			body:       map[string]bool{"enabled": true, "verified": false},
+			body:       map[string]interface{}{"enabled": true, "verified": false},
 			timestamp:  "9876543210",
 			want:       "9876543210.PUT./api/settings.{\"enabled\":true,\"verified\":false}",
 			wantErr:    false,
@@ -45,7 +45,7 @@ func TestBuildCanonicalString(t *testing.T) {
 			name:       "DELETE request",
 			httpMethod: "DELETE",
 			httpPath:   "/api/resource/123",
-			body:       map[string]bool{},
+			body:       map[string]interface{}{},
 			timestamp:  "1111111111",
 			want:       "1111111111.DELETE./api/resource/123.{}",
 			wantErr:    false,
@@ -54,7 +54,7 @@ func TestBuildCanonicalString(t *testing.T) {
 			name:       "path with query parameters",
 			httpMethod: "GET",
 			httpPath:   "/api/users?page=1&limit=10",
-			body:       map[string]bool{},
+			body:       map[string]interface{}{},
 			timestamp:  "5555555555",
 			want:       "5555555555.GET./api/users?page=1&limit=10.{}",
 			wantErr:    false,
@@ -63,7 +63,7 @@ func TestBuildCanonicalString(t *testing.T) {
 			name:       "different timestamp format",
 			httpMethod: "POST",
 			httpPath:   "/webhook",
-			body:       map[string]bool{"test": true},
+			body:       map[string]interface{}{"test": true},
 			timestamp:  "2024-01-01T00:00:00Z",
 			want:       "2024-01-01T00:00:00Z.POST./webhook.{\"test\":true}",
 			wantErr:    false,
@@ -178,7 +178,7 @@ func TestBuildCanonicalStringAndSign_Integration(t *testing.T) {
 	// Integration test to verify the full flow works correctly
 	httpMethod := "POST"
 	httpPath := "/api/jobs/execute"
-	body := map[string]bool{"active": true, "priority": false}
+	body := map[string]interface{}{"active": true, "priority": false}
 	timestamp := "1234567890"
 	secret := "test-secret-key"
 
@@ -207,9 +207,18 @@ func TestBuildCanonicalStringAndSign_Integration(t *testing.T) {
 	}
 }
 
+func TestBuildCanonicalString_MarshalError(t *testing.T) {
+	// math.NaN() is not JSON-serializable; json.Marshal returns an error
+	body := map[string]interface{}{"value": func() {}} // functions are not JSON-serializable
+	_, err := BuildCanonicalString("GET", "/test", body, "1234567890")
+	if err == nil {
+		t.Error("BuildCanonicalString() expected error for unmarshallable body, got nil")
+	}
+}
+
 // Benchmark tests
 func BenchmarkBuildCanonicalString(b *testing.B) {
-	body := map[string]bool{"active": true, "enabled": false}
+	body := map[string]interface{}{"active": true, "enabled": false}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = BuildCanonicalString("POST", "/api/test", body, "1234567890")
