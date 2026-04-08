@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 	"github.com/test-fleet/test-runner/internal/config"
 	"github.com/test-fleet/test-runner/internal/heartbeat"
@@ -19,6 +20,10 @@ import (
 )
 
 func Run() {
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using environment variables")
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal(err)

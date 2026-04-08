@@ -65,7 +65,7 @@ func (c *Client) sendHeartbeat() {
 		"cpu_percent":   cpuPercent,
 		"mem_used_mb":   memStats.Sys / 1024 / 1024,
 		"heap_alloc_mb": memStats.HeapAlloc / 1024 / 1024,
-		"goroutines":    runtime.NumGoroutine(),
+		"goroutines":    runtime.NumGoroutine(), //! Modify to show number of workers
 		"active_jobs":   c.activeJobs(),
 	}
 	jsonBody, err := json.Marshal(body)
