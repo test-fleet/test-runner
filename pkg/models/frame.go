@@ -3,7 +3,7 @@ package models
 import "time"
 
 type Frame struct {
-	ID         string       `json:"_id"`
+	ID         string       `json:"frameId"`
 	SceneID    string       `json:"sceneId"`
 	Name       string       `json:"name"`
 	Order      int          `json:"order"`
