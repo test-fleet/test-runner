@@ -203,7 +203,7 @@ func TestExecuteFrame_UndefinedURLVariable(t *testing.T) {
 		Extractors: []models.Extractors{},
 	}
 
-	result := r.executeFrame(frame, map[string]models.Variable{}, context.Background())
+	result := r.executeFrame(frame, map[string]models.Variable{}, context.Background(), context.Background(), 30000)
 	assert.Equal(t, "error", result.Status)
 	assert.Contains(t, result.Error, "undefined_var")
 }
@@ -223,7 +223,7 @@ func TestExecuteFrame_UndefinedHeaderVariable(t *testing.T) {
 		Extractors: []models.Extractors{},
 	}
 
-	result := r.executeFrame(frame, map[string]models.Variable{}, context.Background())
+	result := r.executeFrame(frame, map[string]models.Variable{}, context.Background(), context.Background(), 30000)
 	assert.Equal(t, "error", result.Status)
 	assert.Contains(t, result.Error, "undefined_token")
 }
@@ -242,7 +242,7 @@ func TestExecuteFrame_UndefinedBodyVariable(t *testing.T) {
 		Extractors: []models.Extractors{},
 	}
 
-	result := r.executeFrame(frame, map[string]models.Variable{}, context.Background())
+	result := r.executeFrame(frame, map[string]models.Variable{}, context.Background(), context.Background(), 30000)
 	assert.Equal(t, "error", result.Status)
 	assert.Contains(t, result.Error, "undefined_id")
 }
@@ -281,7 +281,7 @@ func TestExecuteFrame_WithVariableSubstitution(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	result := r.executeFrame(frame, vars, ctx)
+	result := r.executeFrame(frame, vars, ctx, context.Background(), 30000)
 	assert.Equal(t, "passed", result.Status)
 	assert.Empty(t, result.Error)
 	assert.Equal(t, "/users/123", capturedPath)
@@ -315,7 +315,7 @@ func TestExecuteFrame_RequestBodySent(t *testing.T) {
 		"age":  {Value: float64(30), Type: "number"},
 	}
 
-	result := r.executeFrame(frame, vars, context.Background())
+	result := r.executeFrame(frame, vars, context.Background(), context.Background(), 30000)
 	assert.Equal(t, "passed", result.Status)
 	assert.Contains(t, string(capturedBody), "Alice")
 	assert.Contains(t, string(capturedBody), "30")
@@ -334,7 +334,7 @@ func TestExecuteFrame_HTTPRequestFailure(t *testing.T) {
 		Extractors: []models.Extractors{},
 	}
 
-	result := r.executeFrame(frame, map[string]models.Variable{}, context.Background())
+	result := r.executeFrame(frame, map[string]models.Variable{}, context.Background(), context.Background(), 30000)
 	assert.Equal(t, "error", result.Status)
 	assert.NotEmpty(t, result.Error)
 }
@@ -363,7 +363,7 @@ func TestExecuteFrame_ExtractsVariablesFromResponse(t *testing.T) {
 	}
 
 	vars := map[string]models.Variable{}
-	result := r.executeFrame(frame, vars, context.Background())
+	result := r.executeFrame(frame, vars, context.Background(), context.Background(), 30000)
 
 	assert.Equal(t, "passed", result.Status)
 	assert.Empty(t, result.Error)

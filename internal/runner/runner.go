@@ -3,6 +3,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -51,7 +52,7 @@ func (e *TestRunner) Run(ctx context.Context, job *models.Job) *models.SceneResu
 
 	for _, frame := range frames {
 		frameCtx, frameCancel := context.WithTimeout(sceneCtx, time.Duration(frame.Request.Timeout)*time.Millisecond)
-		frameResult := e.executeFrame(frame, sceneVars, frameCtx)
+		frameResult := e.executeFrame(frame, sceneVars, frameCtx, sceneCtx, scene.Timeout)
 		frameCancel()
 
 		frameResults = append(frameResults, frameResult)
@@ -77,7 +78,7 @@ func (e *TestRunner) Run(ctx context.Context, job *models.Job) *models.SceneResu
 	}
 }
 
-func (e *TestRunner) executeFrame(frame models.Frame, vars map[string]models.Variable, frameCtx context.Context) models.FrameResult {
+func (e *TestRunner) executeFrame(frame models.Frame, vars map[string]models.Variable, frameCtx, sceneCtx context.Context, sceneTimeoutMs int) models.FrameResult {
 	frameStart := time.Now()
 
 	result := models.FrameResult{
@@ -136,6 +137,12 @@ func (e *TestRunner) executeFrame(frame models.Frame, vars map[string]models.Var
 	res, err := e.sendHttpRequest(req, frameCtx)
 	responseDurationMs := time.Since(reqStart).Milliseconds()
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			if sceneCtx.Err() != nil {
+				return e.errorFrame(result, frameStart, fmt.Errorf("scene timeout of %dms exceeded (frame ran for %dms)", sceneTimeoutMs, responseDurationMs))
+			}
+			return e.errorFrame(result, frameStart, fmt.Errorf("frame timeout of %dms exceeded (request took %dms)", frame.Request.Timeout, responseDurationMs))
+		}
 		return e.errorFrame(result, frameStart, fmt.Errorf("http request failed: %w", err))
 	}
 	defer res.Body.Close()
