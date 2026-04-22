@@ -28,7 +28,7 @@ func (e *TestRunner) checkAssertion(res *http.Response, body []byte, a models.As
 
 	var actual interface{}
 	switch strings.ToLower(a.Type) {
-	case "status_code":
+	case "status", "status_code":
 		actual = res.StatusCode
 	case "header":
 		actual = res.Header.Get(a.Source)
