@@ -16,13 +16,13 @@ import (
 
 func testRunner(t *testing.T) runner.TestRunner {
 	t.Helper()
-	return *runner.NewTestRunner(log.New(io.Discard, "", 0))
+	return *runner.NewTestRunner(log.New(io.Discard, "", 0), "")
 }
 
 func TestNewWorkerPool(t *testing.T) {
 	logger := log.New(io.Discard, "", 0)
 	jobChan := make(chan *models.Job)
-	resultsChan := make(chan bool)
+	resultsChan := make(chan *models.SceneResult)
 
 	pool := NewWorkerPool(logger, jobChan, resultsChan, 5, testRunner(t))
 
@@ -33,7 +33,7 @@ func TestNewWorkerPool(t *testing.T) {
 func TestActiveJobs_InitiallyZero(t *testing.T) {
 	logger := log.New(io.Discard, "", 0)
 	jobChan := make(chan *models.Job)
-	resultsChan := make(chan bool)
+	resultsChan := make(chan *models.SceneResult)
 
 	pool := NewWorkerPool(logger, jobChan, resultsChan, 3, testRunner(t))
 
@@ -43,7 +43,7 @@ func TestActiveJobs_InitiallyZero(t *testing.T) {
 func TestWorkerPool_ContextCancellation(t *testing.T) {
 	logger := log.New(io.Discard, "", 0)
 	jobChan := make(chan *models.Job)
-	resultsChan := make(chan bool, 10)
+	resultsChan := make(chan *models.SceneResult, 10)
 
 	pool := NewWorkerPool(logger, jobChan, resultsChan, 3, testRunner(t))
 
@@ -68,7 +68,7 @@ func TestWorkerPool_ContextCancellation(t *testing.T) {
 func TestWorkerPool_JobChannelClose(t *testing.T) {
 	logger := log.New(io.Discard, "", 0)
 	jobChan := make(chan *models.Job)
-	resultsChan := make(chan bool, 10)
+	resultsChan := make(chan *models.SceneResult, 10)
 
 	pool := NewWorkerPool(logger, jobChan, resultsChan, 2, testRunner(t))
 	pool.Start(context.Background())
@@ -97,7 +97,7 @@ func TestWorkerPool_ProcessJob(t *testing.T) {
 
 	logger := log.New(io.Discard, "", 0)
 	jobChan := make(chan *models.Job, 1)
-	resultsChan := make(chan bool, 1)
+	resultsChan := make(chan *models.SceneResult, 1)
 
 	pool := NewWorkerPool(logger, jobChan, resultsChan, 1, testRunner(t))
 
@@ -129,7 +129,7 @@ func TestWorkerPool_ProcessJob(t *testing.T) {
 
 	select {
 	case result := <-resultsChan:
-		assert.True(t, result)
+		assert.Equal(t, "passed", result.Status)
 	case <-time.After(3 * time.Second):
 		t.Fatal("Did not receive job result in time")
 	}
@@ -146,7 +146,7 @@ func TestWorkerPool_MultipleJobs(t *testing.T) {
 
 	logger := log.New(io.Discard, "", 0)
 	jobChan := make(chan *models.Job, 3)
-	resultsChan := make(chan bool, 3)
+	resultsChan := make(chan *models.SceneResult, 3)
 
 	pool := NewWorkerPool(logger, jobChan, resultsChan, 2, testRunner(t))
 
@@ -194,7 +194,7 @@ func TestWorkerPool_MultipleJobs(t *testing.T) {
 func TestWorkerPool_Wait(t *testing.T) {
 	logger := log.New(io.Discard, "", 0)
 	jobChan := make(chan *models.Job)
-	resultsChan := make(chan bool, 10)
+	resultsChan := make(chan *models.SceneResult, 10)
 
 	pool := NewWorkerPool(logger, jobChan, resultsChan, 2, testRunner(t))
 

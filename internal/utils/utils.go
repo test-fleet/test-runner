@@ -8,7 +8,7 @@ import (
 	"fmt"
 )
 
-func BuildCanonicalString(httpMethod string, httpPath string, body map[string]interface{}, timestamp string) (string, error) {
+func BuildCanonicalString(httpMethod string, httpPath string, body interface{}, timestamp string) (string, error) {
 	b, err := json.Marshal(body)
 	if err != nil {
 		return "", err

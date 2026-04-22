@@ -13,6 +13,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/test-fleet/test-runner/internal/config"
 	"github.com/test-fleet/test-runner/internal/heartbeat"
+	"github.com/test-fleet/test-runner/internal/reporter"
 	"github.com/test-fleet/test-runner/internal/runner"
 	"github.com/test-fleet/test-runner/internal/subscriber"
 	"github.com/test-fleet/test-runner/internal/worker"
@@ -42,13 +43,13 @@ func Run() {
 	}
 
 	jobChan := make(chan *models.Job)
-	resChan := make(chan bool)
+	resChan := make(chan *models.SceneResult)
 
 	subLogger := log.New(os.Stderr, "Redis client: ", log.LstdFlags)
 	sub := subscriber.NewSubscriber(cfg, client, jobChan, subLogger)
 
 	runLogger := log.New(os.Stderr, "Test Runner: ", log.LstdFlags)
-	runner := runner.NewTestRunner(runLogger)
+	testRunner := runner.NewTestRunner(runLogger, cfg.RunnerName)
 
 	workerLogger := log.New(os.Stderr, "Workers: ", log.LstdFlags)
 	workers := worker.NewWorkerPool(
@@ -56,14 +57,15 @@ func Run() {
 		jobChan,
 		resChan,
 		cfg.MaxWorkers,
-		*runner,
+		*testRunner,
 	)
 	workers.Start(ctx)
 
-	hbLogger := log.New(os.Stderr, "Heartbeat Client: ", log.LstdFlags)
 	httpClient := &http.Client{
 		Timeout: 15 * time.Second,
 	}
+
+	hbLogger := log.New(os.Stderr, "Heartbeat Client: ", log.LstdFlags)
 	heartbeatClient := heartbeat.NewClient(cfg, hbLogger, httpClient, workers.ActiveJobs)
 	go heartbeatClient.Run(ctx)
 
@@ -81,13 +83,13 @@ func Run() {
 		log.Println("shutting down workers")
 	}()
 
-	resultsLogger := log.New(os.Stderr, "Reporter: ", log.LstdFlags)
+	reporterLogger := log.New(os.Stderr, "Reporter: ", log.LstdFlags)
+	reporterClient := reporter.NewClient(cfg, reporterLogger, httpClient)
 	go func() {
 		for result := range resChan {
-			resultsLogger.Printf("Received test result: %v", result)
-			// TODO: Send result to API via HTTP
+			reporterClient.Send(result)
 		}
-		resultsLogger.Println("Results channel closed, result processor exiting")
+		reporterLogger.Println("Results channel closed, reporter exiting")
 	}()
 
 	<-ctx.Done()

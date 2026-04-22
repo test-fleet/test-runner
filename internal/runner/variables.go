@@ -180,13 +180,15 @@ func (e *TestRunner) replaceJsonVars(jsonText string, varMap map[string]models.V
 						str = fmt.Sprintf("%v", v)
 					}
 
+					// json.Marshal adds surrounding quotes, but template placeholders are
+					// already inside JSON string context — keep only the escaped content.
 					bytes, _ := json.Marshal(str)
-					replacement = string(bytes)
+					replacement = string(bytes[1 : len(bytes)-1])
 
 				default:
 					str := fmt.Sprintf("%v", variable.Value)
 					bytes, _ := json.Marshal(str)
-					replacement = string(bytes)
+					replacement = string(bytes[1 : len(bytes)-1])
 				}
 
 				result = strings.Replace(result, placeholder, replacement, -1)

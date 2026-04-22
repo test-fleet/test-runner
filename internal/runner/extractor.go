@@ -77,20 +77,6 @@ func (e *TestRunner) extractVariables(res *http.Response, extractors []models.Ex
 	return nil
 }
 
-func (e *TestRunner) extractJson(path string, res *http.Response) (interface{}, string, error) {
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	var jsonData interface{}
-	if err := json.Unmarshal(body, &jsonData); err != nil {
-		return nil, "", fmt.Errorf("failed to parse JSON: %w", err)
-	}
-
-	return e.extractJsonFromParsed(path, jsonData)
-}
-
 func (e *TestRunner) extractJsonFromParsed(path string, jsonData interface{}) (interface{}, string, error) {
 	value, err := jsonpath.JsonPathLookup(jsonData, path)
 	if err != nil {
@@ -102,32 +88,27 @@ func (e *TestRunner) extractJsonFromParsed(path string, jsonData interface{}) (i
 }
 
 func (e *TestRunner) extractHeader(headerName string, res *http.Response) (string, error) {
-	headerName = strings.ToLower(headerName)
-
-	for key, values := range res.Header {
-		if strings.ToLower(key) == headerName {
-			if len(values) > 0 {
-				return values[0], nil
-			}
-			return "", nil
-		}
+	values, exists := res.Header[http.CanonicalHeaderKey(headerName)]
+	if !exists {
+		return "", fmt.Errorf("header %s not found", headerName)
 	}
-
-	return "", fmt.Errorf("header %s not found", headerName)
+	if len(values) == 0 {
+		return "", nil
+	}
+	return values[0], nil
 }
 
 func determineType(value interface{}) string {
-	switch v := value.(type) {
+	switch value.(type) {
 	case string:
 		return "string"
-	case float64, int, int64, int32:
+	case float64:
 		return "number"
 	case bool:
 		return "boolean"
 	case nil:
 		return "null"
 	default:
-		_ = v
 		return "string"
 	}
 }

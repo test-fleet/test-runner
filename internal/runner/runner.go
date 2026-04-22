@@ -1,8 +1,10 @@
 package runner
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"sort"
@@ -13,25 +15,28 @@ import (
 )
 
 type Runner interface {
-	Run(ctx context.Context, job string) bool // should return result type
+	Run(ctx context.Context, job *models.Job) *models.SceneResult
 }
 
 type TestRunner struct {
 	logger     *log.Logger
 	httpClient *http.Client
+	runnerName string
 }
 
-func NewTestRunner(logger *log.Logger) *TestRunner {
+func NewTestRunner(logger *log.Logger, runnerName string) *TestRunner {
 	client := &http.Client{}
 	return &TestRunner{
 		logger:     logger,
 		httpClient: client,
+		runnerName: runnerName,
 	}
 }
 
-func (e *TestRunner) Run(ctx context.Context, job *models.Job) bool { // TODO: Add check on done chan to return timeout err
+func (e *TestRunner) Run(ctx context.Context, job *models.Job) *models.SceneResult {
 	scene := job.Scene
 	sceneVars := scene.Variables
+	sceneStart := time.Now()
 
 	sceneCtx, sceneCancel := context.WithTimeout(context.Background(), time.Duration(scene.Timeout)*time.Millisecond)
 	defer sceneCancel()
@@ -41,27 +46,50 @@ func (e *TestRunner) Run(ctx context.Context, job *models.Job) bool { // TODO: A
 		return frames[i].Order < frames[j].Order
 	})
 
+	frameResults := make([]models.FrameResult, 0, len(frames))
+	sceneStatus := "passed"
+
 	for _, frame := range frames {
 		frameCtx, frameCancel := context.WithTimeout(sceneCtx, time.Duration(frame.Request.Timeout)*time.Millisecond)
-		pass, err := e.executeFrame(frame, sceneVars, frameCtx)
-
+		frameResult := e.executeFrame(frame, sceneVars, frameCtx)
 		frameCancel()
 
-		if !pass || err != nil {
-			//!  send failed scene to res chan
-			e.logger.Println("frame failed, closing scene")
+		frameResults = append(frameResults, frameResult)
+
+		if frameResult.Status != "passed" {
+			sceneStatus = frameResult.Status
 			sceneCancel()
+			break
 		}
 	}
 
-	return true
+	completedAt := time.Now()
+	return &models.SceneResult{
+		RunID:       job.RunID,
+		JobID:       job.JobID,
+		SceneID:     scene.ID,
+		RunnerID:    e.runnerName,
+		StartedAt:   sceneStart,
+		CompletedAt: completedAt,
+		DurationMs:  completedAt.Sub(sceneStart).Milliseconds(),
+		Status:      sceneStatus,
+		Frames:      frameResults,
+	}
 }
 
-func (e *TestRunner) executeFrame(frame models.Frame, vars map[string]models.Variable, frameCtx context.Context) (bool, error) {
+func (e *TestRunner) executeFrame(frame models.Frame, vars map[string]models.Variable, frameCtx context.Context) models.FrameResult {
+	frameStart := time.Now()
+
+	result := models.FrameResult{
+		FrameID: frame.ID,
+		Name:    frame.Name,
+		Order:   frame.Order,
+	}
+
 	varsInUrl := e.findVariableRefs(frame.Request.URL)
 	for _, v := range varsInUrl {
 		if _, exists := vars[v]; !exists {
-			return false, fmt.Errorf("variable ${%s} referenced in URL but not defined", v)
+			return e.errorFrame(result, frameStart, fmt.Errorf("variable ${%s} referenced in URL but not defined", v))
 		}
 	}
 	processedUrl := e.replaceUrlVars(frame.Request.URL, vars)
@@ -70,7 +98,7 @@ func (e *TestRunner) executeFrame(frame models.Frame, vars map[string]models.Var
 		varsInHeader := e.findVariableRefs(headerVal)
 		for _, v := range varsInHeader {
 			if _, exists := vars[v]; !exists {
-				return false, fmt.Errorf("variable ${%s} referenced in headers but not defined", v)
+				return e.errorFrame(result, frameStart, fmt.Errorf("variable ${%s} referenced in headers but not defined", v))
 			}
 		}
 	}
@@ -84,31 +112,86 @@ func (e *TestRunner) executeFrame(frame models.Frame, vars map[string]models.Var
 		varsInBody := e.findVariableRefs(frame.Request.Body)
 		for _, v := range varsInBody {
 			if _, exists := vars[v]; !exists {
-				return false, fmt.Errorf("variable ${%s} referenced in request body but not defined", v)
+				return e.errorFrame(result, frameStart, fmt.Errorf("variable ${%s} referenced in request body but not defined", v))
 			}
 		}
 	}
 	processedBody := e.replaceJsonVars(frame.Request.Body, vars)
 
-	req, err := http.NewRequest(
-		frame.Request.Method,
-		processedUrl,
-		strings.NewReader(processedBody),
-	)
-	if err != nil {
-		return false, fmt.Errorf("failed to create new http request: %w", err)
+	result.Request = models.FrameRequest{
+		Method:  frame.Request.Method,
+		URL:     processedUrl,
+		Headers: headers,
 	}
 
+	req, err := http.NewRequest(frame.Request.Method, processedUrl, strings.NewReader(processedBody))
+	if err != nil {
+		return e.errorFrame(result, frameStart, fmt.Errorf("failed to create http request: %w", err))
+	}
 	for key, value := range headers {
 		req.Header.Set(key, value)
 	}
 
+	reqStart := time.Now()
 	res, err := e.sendHttpRequest(req, frameCtx)
+	responseDurationMs := time.Since(reqStart).Milliseconds()
 	if err != nil {
-		return false, fmt.Errorf("http request err") // fail test
+		return e.errorFrame(result, frameStart, fmt.Errorf("http request failed: %w", err))
+	}
+	defer res.Body.Close()
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return e.errorFrame(result, frameStart, fmt.Errorf("failed to read response body: %w", err))
+	}
+	res.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	result.Response = models.FrameResponse{
+		StatusCode: res.StatusCode,
+		Headers:    flattenHeaders(res.Header),
+		BodySize:   len(bodyBytes),
+		DurationMs: responseDurationMs,
 	}
 
-	e.extractVariables(res, frame.Extractors, vars)
+	if err := e.extractVariables(res, frame.Extractors, vars); err != nil {
+		return e.errorFrame(result, frameStart, err)
+	}
 
-	return true, nil
+	assertionResults := e.validateAssertions(res, bodyBytes, frame.Assertions)
+	result.Assertions = assertionResults
+
+	frameStatus := "passed"
+	for _, ar := range assertionResults {
+		if !ar.Passed {
+			frameStatus = "failed"
+			break
+		}
+	}
+
+	completedAt := time.Now()
+	result.Status = frameStatus
+	result.StartedAt = frameStart
+	result.CompletedAt = completedAt
+	result.DurationMs = completedAt.Sub(frameStart).Milliseconds()
+	return result
+}
+
+func (e *TestRunner) errorFrame(result models.FrameResult, start time.Time, err error) models.FrameResult {
+	completedAt := time.Now()
+	result.Status = "error"
+	result.Error = err.Error()
+	result.StartedAt = start
+	result.CompletedAt = completedAt
+	result.DurationMs = completedAt.Sub(start).Milliseconds()
+	return result
+}
+
+func flattenHeaders(h http.Header) map[string]string {
+	flat := make(map[string]string, len(h))
+	for key, values := range h {
+		if len(values) > 0 {
+			flat[key] = values[0]
+		}
+	}
+	return flat
 }

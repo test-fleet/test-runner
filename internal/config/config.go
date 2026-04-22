@@ -83,6 +83,7 @@ func Load() (*Config, error) {
 		ControlServerUrl:  serverUrl,
 		ApiKey:            apiKey,
 		ApiSecret:         apiSecret,
+		RunnerName:        runnerName,
 		Channel:           redisChannel,
 		MaxWorkers:        maxWorkersNum,
 		HeartbeatInterval: time.Duration(intervalSec) * time.Second,

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/test-fleet/test-runner/pkg/models"
 )
 
@@ -24,7 +23,7 @@ func newTestRunner(t *testing.T, httpClient *http.Client) *TestRunner {
 
 func TestNewTestRunner(t *testing.T) {
 	logger := log.New(io.Discard, "", 0)
-	r := NewTestRunner(logger)
+	r := NewTestRunner(logger, "test-runner")
 
 	assert.NotNil(t, r)
 	assert.Equal(t, logger, r.logger)
@@ -61,7 +60,7 @@ func TestRun_SingleFrame(t *testing.T) {
 	}
 
 	result := r.Run(context.Background(), job)
-	assert.True(t, result)
+	assert.Equal(t, "passed", result.Status)
 }
 
 func TestRun_FrameOrdering(t *testing.T) {
@@ -171,7 +170,7 @@ func TestRun_VariableSubstitutionAcrossFrames(t *testing.T) {
 	}
 
 	result := r.Run(context.Background(), job)
-	assert.True(t, result)
+	assert.Equal(t, "passed", result.Status)
 	assert.Equal(t, "Bearer abc123", capturedToken)
 }
 
@@ -188,7 +187,7 @@ func TestRun_NoFrames(t *testing.T) {
 	}
 
 	result := r.Run(context.Background(), job)
-	assert.True(t, result)
+	assert.Equal(t, "passed", result.Status)
 }
 
 func TestExecuteFrame_UndefinedURLVariable(t *testing.T) {
@@ -204,10 +203,9 @@ func TestExecuteFrame_UndefinedURLVariable(t *testing.T) {
 		Extractors: []models.Extractors{},
 	}
 
-	pass, err := r.executeFrame(frame, map[string]models.Variable{}, context.Background())
-	assert.False(t, pass)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "undefined_var")
+	result := r.executeFrame(frame, map[string]models.Variable{}, context.Background())
+	assert.Equal(t, "error", result.Status)
+	assert.Contains(t, result.Error, "undefined_var")
 }
 
 func TestExecuteFrame_UndefinedHeaderVariable(t *testing.T) {
@@ -225,10 +223,9 @@ func TestExecuteFrame_UndefinedHeaderVariable(t *testing.T) {
 		Extractors: []models.Extractors{},
 	}
 
-	pass, err := r.executeFrame(frame, map[string]models.Variable{}, context.Background())
-	assert.False(t, pass)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "undefined_token")
+	result := r.executeFrame(frame, map[string]models.Variable{}, context.Background())
+	assert.Equal(t, "error", result.Status)
+	assert.Contains(t, result.Error, "undefined_token")
 }
 
 func TestExecuteFrame_UndefinedBodyVariable(t *testing.T) {
@@ -245,10 +242,9 @@ func TestExecuteFrame_UndefinedBodyVariable(t *testing.T) {
 		Extractors: []models.Extractors{},
 	}
 
-	pass, err := r.executeFrame(frame, map[string]models.Variable{}, context.Background())
-	assert.False(t, pass)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "undefined_id")
+	result := r.executeFrame(frame, map[string]models.Variable{}, context.Background())
+	assert.Equal(t, "error", result.Status)
+	assert.Contains(t, result.Error, "undefined_id")
 }
 
 func TestExecuteFrame_WithVariableSubstitution(t *testing.T) {
@@ -285,9 +281,9 @@ func TestExecuteFrame_WithVariableSubstitution(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	pass, err := r.executeFrame(frame, vars, ctx)
-	assert.True(t, pass)
-	assert.NoError(t, err)
+	result := r.executeFrame(frame, vars, ctx)
+	assert.Equal(t, "passed", result.Status)
+	assert.Empty(t, result.Error)
 	assert.Equal(t, "/users/123", capturedPath)
 	assert.Equal(t, "Bearer secret-token", capturedAuth)
 }
@@ -319,15 +315,13 @@ func TestExecuteFrame_RequestBodySent(t *testing.T) {
 		"age":  {Value: float64(30), Type: "number"},
 	}
 
-	pass, err := r.executeFrame(frame, vars, context.Background())
-	assert.True(t, pass)
-	assert.NoError(t, err)
+	result := r.executeFrame(frame, vars, context.Background())
+	assert.Equal(t, "passed", result.Status)
 	assert.Contains(t, string(capturedBody), "Alice")
 	assert.Contains(t, string(capturedBody), "30")
 }
 
 func TestExecuteFrame_HTTPRequestFailure(t *testing.T) {
-	// Use a client with very short timeout to force failure
 	r := newTestRunner(t, &http.Client{Timeout: 1 * time.Millisecond})
 
 	frame := models.Frame{
@@ -340,9 +334,9 @@ func TestExecuteFrame_HTTPRequestFailure(t *testing.T) {
 		Extractors: []models.Extractors{},
 	}
 
-	pass, err := r.executeFrame(frame, map[string]models.Variable{}, context.Background())
-	assert.False(t, pass)
-	assert.Error(t, err)
+	result := r.executeFrame(frame, map[string]models.Variable{}, context.Background())
+	assert.Equal(t, "error", result.Status)
+	assert.NotEmpty(t, result.Error)
 }
 
 func TestExecuteFrame_ExtractsVariablesFromResponse(t *testing.T) {
@@ -369,10 +363,10 @@ func TestExecuteFrame_ExtractsVariablesFromResponse(t *testing.T) {
 	}
 
 	vars := map[string]models.Variable{}
-	pass, err := r.executeFrame(frame, vars, context.Background())
+	result := r.executeFrame(frame, vars, context.Background())
 
-	assert.True(t, pass)
-	assert.NoError(t, err)
+	assert.Equal(t, "passed", result.Status)
+	assert.Empty(t, result.Error)
 	assert.Equal(t, float64(42), vars["USER_ID"].Value)
 	assert.Equal(t, "number", vars["USER_ID"].Type)
 	assert.Equal(t, "Bob", vars["USER_NAME"].Value)

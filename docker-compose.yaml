@@ -31,7 +31,7 @@ services:
     build:
       context: .
       dockerfile: ./dockerfile
-    container_name: testfleet-runner
+    container_name: test-runner
     restart: unless-stopped
     environment:
       CONTROL_SERVER_URL: ${CONTROL_SERVER_URL}

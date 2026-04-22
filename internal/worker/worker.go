@@ -13,7 +13,7 @@ import (
 type WorkerPool struct {
 	logger      *log.Logger
 	jobChan     <-chan *models.Job
-	resultsChan chan<- bool
+	resultsChan chan<- *models.SceneResult
 	maxWorkers  int
 	runner      runner.TestRunner
 	wg          sync.WaitGroup
@@ -23,7 +23,7 @@ type WorkerPool struct {
 func NewWorkerPool(
 	logger *log.Logger,
 	jobChan <-chan *models.Job,
-	resultsChan chan<- bool,
+	resultsChan chan<- *models.SceneResult,
 	maxWorkers int,
 	runner runner.TestRunner,
 ) *WorkerPool {
