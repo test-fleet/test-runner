@@ -51,7 +51,11 @@ func (e *TestRunner) Run(ctx context.Context, job *models.Job) *models.SceneResu
 	sceneStatus := "passed"
 
 	for _, frame := range frames {
-		frameCtx, frameCancel := context.WithTimeout(sceneCtx, time.Duration(frame.Request.Timeout)*time.Millisecond)
+		frameDuration := time.Duration(scene.Timeout) * time.Millisecond
+		if frame.Request.Timeout > 0 {
+			frameDuration = time.Duration(frame.Request.Timeout) * time.Millisecond
+		}
+		frameCtx, frameCancel := context.WithTimeout(sceneCtx, frameDuration)
 		frameResult := e.executeFrame(frame, sceneVars, frameCtx, sceneCtx, scene.Timeout)
 		frameCancel()
 
