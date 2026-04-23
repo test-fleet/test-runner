@@ -25,6 +25,8 @@ const (
 	envApiSecret         = "API_SECRET"
 	envHeartbeatInterval = "HEARTBEAT_INTERVAL"
 	envRedisChannel      = "REDIS_CHANNEL"
+	envRunnerName        = "RUNNER_NAME"
+	envMaxWorkers        = "MAX_WORKERS"
 )
 
 func Load() (*Config, error) {
@@ -58,7 +60,7 @@ func Load() (*Config, error) {
 		heartbeatInterval = "3"
 	}
 
-	runnerName := os.Getenv("RUNNER_NAME")
+	runnerName := os.Getenv(envRunnerName)
 	if runnerName == "" {
 		runnerName = "unnamed-runner"
 	}
@@ -68,7 +70,7 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	maxWorkers := os.Getenv("MAX_WORKERS")
+	maxWorkers := os.Getenv(envMaxWorkers)
 	if maxWorkers == "" {
 		maxWorkers = "10"
 	}
