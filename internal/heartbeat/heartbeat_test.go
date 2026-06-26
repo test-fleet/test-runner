@@ -23,7 +23,7 @@ func TestNewClient(t *testing.T) {
 	logger := log.New(io.Discard, "", 0)
 	httpClient := &http.Client{}
 
-	client := NewClient(cfg, logger, httpClient, func() int { return 0 })
+	client := NewClient(cfg, logger, httpClient, func() int { return 0 }, "test-instance-id")
 
 	if client == nil {
 		t.Fatal("NewClient() returned nil")
@@ -63,6 +63,9 @@ func TestSendHeartbeat_Success(t *testing.T) {
 		if r.Header.Get("signature") == "" {
 			t.Error("Missing signature header")
 		}
+		if r.Header.Get("x-instance-id") == "" {
+			t.Error("Missing x-instance-id header")
+		}
 
 		// Verify body
 		body, _ := io.ReadAll(r.Body)
@@ -84,7 +87,7 @@ func TestSendHeartbeat_Success(t *testing.T) {
 	logger := log.New(io.Discard, "", 0)
 	httpClient := server.Client()
 
-	client := NewClient(cfg, logger, httpClient, func() int { return 0 })
+	client := NewClient(cfg, logger, httpClient, func() int { return 0 }, "test-instance-id")
 	client.sendHeartbeat()
 	// If we get here without panic, test passes
 }
@@ -106,7 +109,7 @@ func TestSendHeartbeat_ServerError(t *testing.T) {
 	logger := log.New(io.Discard, "", 0)
 	httpClient := server.Client()
 
-	client := NewClient(cfg, logger, httpClient, func() int { return 0 })
+	client := NewClient(cfg, logger, httpClient, func() int { return 0 }, "test-instance-id")
 	// Should not panic, just log the error
 	client.sendHeartbeat()
 }
@@ -129,7 +132,7 @@ func TestRun_ContextCancellation(t *testing.T) {
 	logger := log.New(io.Discard, "", 0)
 	httpClient := server.Client()
 
-	client := NewClient(cfg, logger, httpClient, func() int { return 0 })
+	client := NewClient(cfg, logger, httpClient, func() int { return 0 }, "test-instance-id")
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -176,7 +179,7 @@ func TestRun_SendsPeriodicHeartbeats(t *testing.T) {
 	logger := log.New(io.Discard, "", 0)
 	httpClient := server.Client()
 
-	client := NewClient(cfg, logger, httpClient, func() int { return 0 })
+	client := NewClient(cfg, logger, httpClient, func() int { return 0 }, "test-instance-id")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()

@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"log"
 	"net/http"
 	"os"
@@ -30,7 +32,15 @@ func Run() {
 		log.Fatal(err)
 	}
 
-	ctx, _ := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	instanceBytes := make([]byte, 8)
+	if _, err := rand.Read(instanceBytes); err != nil {
+		log.Fatalf("err: failed to generate instance id: %v", err)
+	}
+	instanceID := hex.EncodeToString(instanceBytes)
+	log.Printf("Instance ID: %s", instanceID)
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	opts, err := redis.ParseURL(cfg.RedisUrl)
 	if err != nil {
@@ -66,7 +76,7 @@ func Run() {
 	}
 
 	hbLogger := log.New(os.Stderr, "Heartbeat Client: ", log.LstdFlags)
-	heartbeatClient := heartbeat.NewClient(cfg, hbLogger, httpClient, workers.ActiveJobs)
+	heartbeatClient := heartbeat.NewClient(cfg, hbLogger, httpClient, workers.ActiveJobs, instanceID)
 	go heartbeatClient.Run(ctx)
 
 	go func() {
