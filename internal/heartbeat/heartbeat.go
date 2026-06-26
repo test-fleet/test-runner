@@ -22,15 +22,17 @@ type Client struct {
 	http       *http.Client
 	activeJobs func() int
 	instanceID string
+	runnerName string
 }
 
-func NewClient(cfg *config.Config, logger *log.Logger, httpClient *http.Client, activeJobs func() int, instanceID string) *Client {
+func NewClient(cfg *config.Config, logger *log.Logger, httpClient *http.Client, activeJobs func() int, instanceID string, runnerName string) *Client {
 	return &Client{
 		cfg:        cfg,
 		logger:     logger,
 		http:       httpClient,
 		activeJobs: activeJobs,
 		instanceID: instanceID,
+		runnerName: runnerName,
 	}
 }
 
@@ -103,6 +105,7 @@ func (c *Client) sendHeartbeat() {
 	req.Header.Set("x-request-timestamp", isoTsString)
 	req.Header.Set("signature", fmt.Sprintf("sha256=%s", signedCanonical))
 	req.Header.Set("x-instance-id", c.instanceID)
+	req.Header.Set("x-runner-name", c.runnerName)
 
 	res, err := c.http.Do(req)
 	if err != nil {

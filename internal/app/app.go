@@ -76,7 +76,7 @@ func Run() {
 	}
 
 	hbLogger := log.New(os.Stderr, "Heartbeat Client: ", log.LstdFlags)
-	heartbeatClient := heartbeat.NewClient(cfg, hbLogger, httpClient, workers.ActiveJobs, instanceID)
+	heartbeatClient := heartbeat.NewClient(cfg, hbLogger, httpClient, workers.ActiveJobs, instanceID, cfg.RunnerName)
 	go heartbeatClient.Run(ctx)
 
 	go func() {
