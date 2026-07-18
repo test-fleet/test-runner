@@ -87,6 +87,38 @@ func Run() {
 		log.Println("shutting down subscriber")
 	}()
 
+	// Watchdog: the pub/sub connection above can silently die and retry
+	// forever without ever surfacing an error (go-redis reconnects
+	// internally), while the heartbeat client below keeps succeeding over
+	// a separate HTTP connection — meaning the runner would look healthy
+	// while never receiving new jobs. Ping Redis directly on a timer and
+	// exit (letting Kubernetes restart the pod) after sustained failures.
+	watchdogLogger := log.New(os.Stderr, "Redis Watchdog: ", log.LstdFlags)
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		failures := 0
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				err := client.Ping(pingCtx).Err()
+				cancel()
+				if err != nil {
+					failures++
+					watchdogLogger.Printf("err: redis ping failed (%d/3): %v", failures, err)
+					if failures >= 3 {
+						log.Fatalf("err: redis unreachable after %d consecutive checks, exiting", failures)
+					}
+					continue
+				}
+				failures = 0
+			}
+		}
+	}()
+
 	go func() {
 		workers.Wait()
 		close(resChan)

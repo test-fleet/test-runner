@@ -41,7 +41,8 @@ func (s *Subscriber) Subscribe(ctx context.Context) error {
 		case msg := <-pubsub.Channel():
 			job, err := s.parseJob(msg.Payload) // parse job here
 			if err != nil {
-				return err
+				s.logger.Printf("err: failed to parse job, skipping: %v", err)
+				continue
 			}
 			select {
 			case s.jobChan <- job:
