@@ -24,9 +24,14 @@ const (
 	envApiKey            = "API_KEY"
 	envApiSecret         = "API_SECRET"
 	envHeartbeatInterval = "HEARTBEAT_INTERVAL"
-	envRedisChannel      = "REDIS_CHANNEL"
 	envRunnerName        = "RUNNER_NAME"
 	envMaxWorkers        = "MAX_WORKERS"
+
+	// RedisChannel is the pub/sub channel jobs are dispatched on. Not
+	// user-configurable: it's a shared protocol constant with the control
+	// server, not a pointer to a distinct resource like REDIS_URL is. Must
+	// match the hardcoded value in control-server's src/utils/constants.js.
+	RedisChannel = "testfleet:jobs"
 )
 
 func Load() (*Config, error) {
@@ -48,11 +53,6 @@ func Load() (*Config, error) {
 	apiSecret := os.Getenv(envApiSecret)
 	if apiSecret == "" {
 		return nil, fmt.Errorf("err: env variable (%s) not found", envApiSecret)
-	}
-
-	redisChannel := os.Getenv(envRedisChannel)
-	if redisChannel == "" {
-		return nil, fmt.Errorf("err: env variable (%s) not found", envRedisChannel)
 	}
 
 	heartbeatInterval := os.Getenv(envHeartbeatInterval)
@@ -86,7 +86,7 @@ func Load() (*Config, error) {
 		ApiKey:            apiKey,
 		ApiSecret:         apiSecret,
 		RunnerName:        runnerName,
-		Channel:           redisChannel,
+		Channel:           RedisChannel,
 		MaxWorkers:        maxWorkersNum,
 		HeartbeatInterval: time.Duration(intervalSec) * time.Second,
 	}, nil
